@@ -384,7 +384,7 @@ class BattleScreen(
           null,
           Array(),
           Layout(SOUTHWEST, FIXED, 200, 180),
-          PrintingTextWindowOptions(timePerChar = 0)) {
+          PrintingTextWindowOptions(timePerChar = 0, showArrow = false)) {
           override def openCloseTime = 0
         }
       }
@@ -396,7 +396,7 @@ class BattleScreen(
           null,
           Array(),
           Layout(SOUTHEAST, FIXED, 440, 180),
-          PrintingTextWindowOptions(timePerChar = 0)) {
+          PrintingTextWindowOptions(timePerChar = 0, showArrow = false)) {
           override def openCloseTime = 0
         }
       }
@@ -565,10 +565,10 @@ class BattleScreen(
               showNotifications = true)
 
             if (gold > 0)
-              scriptInterface.showText(Array("Got %d Gold".format(gold)))
+              scriptInterface.showTextScala(Array("Got %d Gold".format(gold)))
 
             if (!itemNames.isEmpty) {
-              scriptInterface.showText(Array("Got %s.".format(
+              scriptInterface.showTextScala(Array("Got %s.".format(
                 itemNames.mkString(", "))))
             }
 
