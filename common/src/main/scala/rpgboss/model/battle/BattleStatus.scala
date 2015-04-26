@@ -99,7 +99,7 @@ object BattleStatus {
         .characterEquip(characterId)
         .filter(_ < allItems.length)
         .filter(id => allItems(id).useOnAttack)
-        .map(id => allItems(id).onUseSkillId)
+        .map(id => allItems(id).equippedAttackSkillId)
     val onAttackSkills =
       if (weaponSkills.size == 0) {
         assume(character.charClass < pData.enums.classes.size)
@@ -111,7 +111,8 @@ object BattleStatus {
 
     assert(character.charClass < pData.enums.classes.length)
     val knownSkillIds =
-      pData.enums.classes(character.charClass).knownSkillIds(level)
+      (pData.enums.classes(character.charClass).knownSkillIds(level) ++
+       partyParams.learnedSkills(characterId)).distinct
 
     new BattleStatus(
       index, pData, BattleEntityType.Party, characterId,

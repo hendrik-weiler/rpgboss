@@ -74,6 +74,9 @@ trait HasScriptConstants {
   def CHARACTER_STATUS_EFFECTS(characterId: Int) =
     "characterStatusEffects-%d".format(characterId)
 
+  def CHARACTER_LEARNED_SKILLS(characterId: Int) =
+    "characterLearnedSkills-%d".format(characterId)
+
   // Synchronized with LayoutType RpgEnum.
   val CENTERED = 0
   val NORTH = 1
@@ -730,6 +733,20 @@ class ScriptInterface(
     persistent.addRemoveGold(delta)
   }
 
+  def addRemoveSkill(add: Boolean, characterId: Int, skillId: Int) = syncRun {
+    persistent.addRemoveLearnedSkills(add, characterId, skillId)
+  }
+
+  def getKnownSkills(characterId: Int): Array[Int] = syncRun {
+    val characterStatus = BattleStatus.fromCharacter(
+      project.data,
+      persistent.getPartyParameters(project.data.enums.characters),
+      characterId, index = -1)
+
+    val allSkills = project.data.enums.skills
+    characterStatus.knownSkillIds
+  }
+
   def useItemInMenu(itemId: Int, characterId: Int) = syncRun {
     if (persistent.addRemoveItem(itemId, -1)) {
       val item = project.data.enums.items(itemId)
@@ -749,6 +766,44 @@ class ScriptInterface(
 
       persistent.saveCharacterVitals(characterId, characterStatus.hp,
         characterStatus.mp, characterStatus.tempStatusEffectIds)
+    }
+  }
+
+  def useSkillInMenu(casterCharacterId: Int, skillId: Int,
+      targetCharacterId: Int) = syncRun {
+    assert(skillId < project.data.enums.skills.length)
+
+    val skill = project.data.enums.skills(skillId)
+
+    val casterStatus = BattleStatus.fromCharacter(
+        project.data,
+        persistent.getPartyParameters(project.data.enums.characters),
+        casterCharacterId, index = -1)
+
+    // Reuse the existing object if it's a self-cast. Otherwise, saving the
+    // character vitals below has unexpected results.
+    val targetStatus =
+      if (targetCharacterId != casterCharacterId) {
+        BattleStatus.fromCharacter(
+            project.data,
+            persistent.getPartyParameters(project.data.enums.characters),
+            targetCharacterId, index = -1)
+      } else {
+        casterStatus
+      }
+
+    assert(skill.cost <= casterStatus.mp)
+
+    casterStatus.mp -= skill.cost
+
+    skill.applySkill(casterStatus, targetStatus)
+
+    persistent.saveCharacterVitals(casterCharacterId, casterStatus.hp,
+        casterStatus.mp, casterStatus.tempStatusEffectIds)
+
+    if (targetCharacterId != casterCharacterId) {
+      persistent.saveCharacterVitals(targetCharacterId, targetStatus.hp,
+          targetStatus.mp, targetStatus.tempStatusEffectIds)
     }
   }
 
