@@ -71,6 +71,10 @@ abstract class Entity(
 
   // TODO: Remove this ghetto RTTI if possible.
   def isPlayer: Boolean = false
+  def collisionOn: Boolean = true
+
+  def inVehicle = false
+  def inVehicleId = -1
 
   /**
    * Called when a player activates the event with a button.
@@ -120,10 +124,42 @@ abstract class Entity(
       x + boundingBoxHalfsize, y + boundingBoxHalfsize)
   }
 
-  def getMapCollisions(dxArg: Float, dyArg: Float) : (Boolean, Int) = {
+  /**
+   * Returns a tuple (ux, uy) representing a unit vector of the face direction.
+   */
+  def getDirectionUnitVector(): (Float, Float) = {
+    dir match {
+      case SpriteSpec.Directions.NORTH => (0f, -1f)
+      case SpriteSpec.Directions.SOUTH => (0f, 1f)
+      case SpriteSpec.Directions.EAST => (1f, 0f)
+      case SpriteSpec.Directions.WEST => (-1f, 0f)
+    }
+  }
+
+  /**
+   * Returns a tuple of (blocked, reroute number).
+   */
+  def getMapCollisions(dxArg: Float, dyArg: Float,
+                       inVehicle: Boolean) : (Boolean, Int) = {
     mapAndAssetsOption map { mapAndAssets =>
-      mapAndAssets.getCollisions(this, x, y, dxArg, dyArg)
+      mapAndAssets.getCollisions(this, x, y, dxArg, dyArg, inVehicle)
     } getOrElse (true, 0)
+  }
+
+  /**
+   * Returns if the entity can freely stand at current position modified by
+   * dx, dy. This 'pretends' that the player is not in a vehicle.
+   */
+  def canStandAt(dx: Float, dy: Float): Boolean = {
+    val (blocked, _) = getMapCollisions(dx, dy, inVehicle = false)
+    if (blocked)
+      return false
+
+    val (_, evtBlocked) = getTouchingAndBlockingEvents(dx, dy)
+    if (evtBlocked)
+      return false
+
+    return true
   }
 
   setBoundingBoxHalfsize(0.5f)
@@ -218,13 +254,13 @@ abstract class Entity(
 
     if(xDiff > 0) {
       xMove = 1
-    } 
+    }
     if(xDiff < 0) {
       xMove = -1
-    } 
+    }
     if(yDiff > 0) {
       yMove = 1
-    } 
+    }
     if(yDiff < 0) {
       yMove = -1
     }
@@ -254,6 +290,20 @@ abstract class Entity(
     assert(!entities.isEmpty)
     entities.minBy(e => math.abs(e.x - (x + dx)) +
                         math.abs(e.y - (y + dy)))
+  }
+
+  /**
+   * Returns the set of events that this entity is touching, and the smaller
+   * set that's blocking it.
+   */
+  def getTouchingAndBlockingEvents(dx: Float, dy: Float) = {
+    val evtsTouched = getAllEventTouches(dx, dy).filter(_ != this)
+
+    val evtBlocking =
+      collisionOn && height == EventHeight.SAME.id &&
+      evtsTouched.exists(_.height == EventHeight.SAME.id)
+
+    (evtsTouched, evtBlocking)
   }
 
   def update(delta: Float, eventsEnabled: Boolean): Unit = {
@@ -335,26 +385,17 @@ case class EntityMove(vec: Vector2)
 
       var movedThisLoop = false
 
-      val evtsTouchedX =
-        entity.getAllEventTouches(dx, 0).filter(_ != entity)
-      val evtsTouchedY =
-        entity.getAllEventTouches(0, dy).filter(_ != entity)
+      val (evtsTouched, evtBlocking) =
+        entity.getTouchingAndBlockingEvents(dx, dy)
 
-      val evtsTouchedSet = evtsTouchedX.toSet ++ evtsTouchedY.toSet
-      entity.touchEntities(evtsTouchedSet)
-
-      val evtBlockingX =
-        entity.height == EventHeight.SAME.id &&
-        evtsTouchedX.exists(_.height == EventHeight.SAME.id)
-      val evtBlockingY =
-        entity.height == EventHeight.SAME.id &&
-        evtsTouchedY.exists(_.height == EventHeight.SAME.id)
+      entity.touchEntities(evtsTouched.toSet)
 
       // Move along x
-      if (!evtBlockingX && dx != 0) {
+      if (!evtBlocking && dx != 0) {
         // Determine collisions in x direction on the y-positive corner
         // and the y negative corner of the bounding box
-        val (mapBlocked, mapReroute) = entity.getMapCollisions(dx, 0)
+        val (mapBlocked, mapReroute) =
+          entity.getMapCollisions(dx, 0, inVehicle = entity.inVehicle)
 
         // Conventional movement if it succeeeds
         if (!mapBlocked) {
@@ -373,10 +414,11 @@ case class EntityMove(vec: Vector2)
       }
 
       // Move along y
-      if (!evtBlockingY && dy != 0) {
+      if (!evtBlocking && dy != 0) {
         // Determine collisions in x direction on the y-positive corner
         // and the y negative corner of the bounding box
-        val (mapBlocked, mapReroute) = entity.getMapCollisions(0, dy)
+        val (mapBlocked, mapReroute) =
+          entity.getMapCollisions(0, dy, inVehicle = entity.inVehicle)
 
         // Conventional movement if it succeeeds
         if (!mapBlocked) {

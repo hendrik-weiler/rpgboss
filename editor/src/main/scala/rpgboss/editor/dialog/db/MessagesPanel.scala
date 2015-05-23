@@ -1,15 +1,12 @@
 package rpgboss.editor.dialog.db
 
-import rpgboss.editor._
-import rpgboss.editor.uibase._
-import rpgboss.editor.uibase.SwingUtils._
-import scala.swing._
-import scala.swing.event._
-import rpgboss.model._
-import rpgboss.model.resource._
-import net.java.dev.designgridlayout._
+import scala.swing.Window
+
+import rpgboss.editor.Internationalized.getMessage
+import rpgboss.editor.StateMaster
 import rpgboss.editor.dialog.DatabaseDialog
-import rpgboss.editor.Internationalized._
+import rpgboss.editor.uibase.DesignGridPanel
+import rpgboss.editor.uibase.StringMapEditingPanel
 
 class MessagesPanel(
   owner: Window,
