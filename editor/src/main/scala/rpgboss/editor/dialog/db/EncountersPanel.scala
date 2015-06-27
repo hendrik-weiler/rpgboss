@@ -21,10 +21,12 @@ import rpgboss.model.battle.Battle
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
 import rpgboss.model.battle.PartyParameters
 import rpgboss.editor.Internationalized._
+import rpgboss.model.EncounterEvent
+import rpgboss.model.EncounterEventMaxFrequency
 
 object EncounterFieldGdxPanel {
-  val width = 640
-  val height = 320
+  val width = 320
+  val height = 160
 }
 
 class EncounterFieldGdxPanel(project: Project, initial: Encounter)
@@ -70,7 +72,9 @@ class EncounterFieldGdxPanel(project: Project, initial: Encounter)
         atlasSprites,
         project,
         EncounterFieldGdxPanel.width,
-        EncounterFieldGdxPanel.height)
+        EncounterFieldGdxPanel.height) {
+        override def drawScale = 0.5f
+      }
 
       // Start visible
       battleScreen.windowManager.transitionAlpha = 0
@@ -153,7 +157,7 @@ class EncountersPanel(
     updateFields()
 
     val fCanEscape = boolField(
-      needsTranslation("Can Escape"), model.canEscape, model.canEscape = _,
+      getMessage("Can_Escape"), model.canEscape, model.canEscape = _,
       Some(updateFields))
 
     def regenerateName(): Unit = {
@@ -201,17 +205,21 @@ class EncountersPanel(
           row().grid(lbl(getMessageColon("Encounter_Name"))).add(fName)
           row().grid().add(fCanEscape)
           row()
-            .grid(lbl(needsTranslationColon("Escape Chance")))
+            .grid(lbl(getMessageColon("Escape_Chance")))
             .add(fEscapeChance)
         }
+
+        contents +=
+          new EncounterEventArrayPanel(dbDiag, model.events, model.events = _)
+      }
+      contents += new BoxPanel(Orientation.Vertical) {
         contents += fDisplay
-      }
-      contents += new BoxPanel(Orientation.Vertical) {
-        contents += btnAdd
-        contents += btnRemove
-      }
-      contents += new BoxPanel(Orientation.Vertical) {
-        contents += leftLabel(getMessageColon("Enemies"))
+
+        contents += new BoxPanel(Orientation.Horizontal) {
+          contents += btnAdd
+          contents += btnRemove
+        }
+
         contents += new ScrollPane(fEnemySelector) {
           preferredSize = new Dimension(200, 120)
         }
@@ -226,5 +234,81 @@ class EncountersPanel(
 
   override def onListDataUpdate() = {
     dbDiag.model.enums.encounters = dataAsArray
+  }
+}
+
+class EncounterEventArrayPanel(
+    dbDiag: DatabaseDialog,
+    initial: Array[EncounterEvent],
+    onUpdate: Array[EncounterEvent] => Unit)
+  extends InlineWidgetArrayEditor(dbDiag, initial, onUpdate) {
+  override def title = getMessage("Events")
+  override def addAction(index: Int) = insertElement(index, EncounterEvent())
+  override def newInlineWidget(model: EncounterEvent) =
+    new EncounterEventPanel(dbDiag, model, sendUpdate)
+}
+
+/**
+ * Updates model in-place.
+ */
+class EncounterEventPanel(
+  dbDiag: DatabaseDialog,
+  initial: EncounterEvent,
+  onUpdate: () => Unit)
+  extends BoxPanel(Orientation.Vertical) {
+  val model = initial
+
+  contents += lbl("Encounter Event")
+  contents += new Button(Action(getMessage("Edit")) {
+    val d = new EncounterEventDialog(dbDiag, dbDiag.stateMaster, model)
+    d.open()
+  })
+}
+
+class EncounterEventDialog(
+  owner: Window,
+  sm: StateMaster,
+  model: EncounterEvent)
+  extends StdDialog(owner, getMessageColon("Edit_Encounter_Event")) {
+
+  centerDialog(new Dimension(600, 600))
+
+  def okFunc() = {
+    close()
+  }
+
+  val fMaxFrequency = enumIdCombo(EncounterEventMaxFrequency)(
+    model.maxFrequency, model.maxFrequency = _)
+
+  val commandBox = new CommandBox(
+    owner,
+    sm,
+    None,
+    model.cmds,
+    model.cmds = _,
+    inner = false)
+
+  contents = new BoxPanel(Orientation.Vertical) {
+    contents += new BoxPanel(Orientation.Horizontal) {
+      contents += new BoxPanel(Orientation.Vertical) {
+        contents += lbl(getMessageColon("Max_Frequency"))
+        contents += fMaxFrequency
+
+        contents += new ConditionsPanel(
+          owner, sm.getProjData, model.conditions, model.conditions = _)
+      }
+
+      contents += new DesignGridPanel {
+        row.grid.add(leftLabel(getMessageColon("Commands")))
+        row.grid.add(new ScrollPane {
+          preferredSize = new Dimension(400, 400)
+          contents = commandBox
+        })
+      }
+    }
+
+    contents += new DesignGridPanel {
+      row().bar().add(okBtn, Tag.OK)
+    }
   }
 }

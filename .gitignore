@@ -1,13 +1,13 @@
 common/lib/
-common/.project
 downloaded-libs
 libs/
 target/
 eclipsetarget/
 src_managed/
+package/jre
 project/boot/
 project/plugins/project
-.cache
+.cache*
 .classpath
 .history
 .project
